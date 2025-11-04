@@ -12,8 +12,13 @@ app.use(cors());
 const server = http.createServer(app);
 const io = socketIO(server, {
   cors: {
-    origin: "*",
-    methods: ["GET", "POST"]
+    origin: [
+      "https://emotion-video-client.vercel.app/",  // ⚠️ REPLACE THIS!
+      "http://localhost:3000",
+      "http://localhost:5173"
+    ],
+    methods: ["GET", "POST"],
+    credentials: true
   }
 });
 
