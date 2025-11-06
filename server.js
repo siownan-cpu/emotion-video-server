@@ -166,10 +166,9 @@ io.on('connection', (socket) => {
     }
     
     // Forward with 'from' field - PRESERVE ALL CANDIDATE DATA
+    // ✨ CRITICAL: Don't use spread operator! Pass candidate as-is
     const candidateData = {
-      candidate: {
-        ...data.candidate  // Spread all properties of the candidate
-      },
+      candidate: data.candidate,  // Pass through unchanged!
       from: socket.id
     };
     
