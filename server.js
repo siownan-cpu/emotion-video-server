@@ -5,7 +5,6 @@ const express = require('express');
 const http = require('http');
 const { Server } = require('socket.io');
 const cors = require('cors');
-const fetch = require('node-fetch'); // You may need to install: npm install node-fetch@2
 require('dotenv').config();
 
 const app = express();
@@ -52,7 +51,7 @@ app.get('/health', (req, res) => {
   });
 });
 
-// ✨ NEW: AssemblyAI Token Generation Endpoint
+// ✨ AssemblyAI Token Generation Endpoint (Using Native Fetch)
 app.post('/api/assemblyai-token', async (req, res) => {
   try {
     console.log('🔑 Generating AssemblyAI temporary token...');
@@ -67,7 +66,7 @@ app.post('/api/assemblyai-token', async (req, res) => {
       });
     }
 
-    // Generate temporary token from AssemblyAI
+    // Generate temporary token from AssemblyAI using native fetch (Node.js 18+)
     const response = await fetch('https://streaming.assemblyai.com/v3/token', {
       method: 'GET',
       headers: {
@@ -207,4 +206,5 @@ httpServer.listen(PORT, () => {
   console.log(`🌐 CORS enabled for: https://emotion-video-client.vercel.app`);
   console.log(`📡 Socket.IO ready`);
   console.log(`🔑 AssemblyAI integration: ${process.env.ASSEMBLYAI_API_KEY ? '✅ Enabled' : '❌ Disabled (API key missing)'}`);
+  console.log(`📦 Node.js version: ${process.version}`);
 });
