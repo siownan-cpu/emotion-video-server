@@ -1,15 +1,27 @@
-// Clean WebRTC Signaling Server
-// Handles connection setup between peers for emotion video calls
+// Enhanced WebRTC Signaling Server with AssemblyAI Integration
+// This handles the connection setup between two parties and provides AssemblyAI tokens
 
 const express = require('express');
-const { createServer } = require('http');
+const http = require('http');
 const { Server } = require('socket.io');
 const cors = require('cors');
+const fetch = require('node-fetch'); // You may need to install: npm install node-fetch@2
+require('dotenv').config();
 
 const app = express();
-const httpServer = createServer(app);
+app.use(cors({
+  origin: [
+    'https://emotion-video-client.vercel.app',
+    'http://localhost:5173',
+    'http://localhost:3000'
+  ],
+  credentials: true
+}));
+app.use(express.json());
 
-// Socket.IO configuration with CORS
+const httpServer = http.createServer(app);
+
+// Socket.IO configuration
 const io = new Server(httpServer, {
   cors: {
     origin: [
@@ -23,19 +35,7 @@ const io = new Server(httpServer, {
   transports: ['websocket', 'polling']
 });
 
-// Express CORS configuration
-app.use(cors({
-  origin: [
-    'https://emotion-video-client.vercel.app',
-    'http://localhost:5173',
-    'http://localhost:3000'
-  ],
-  credentials: true
-}));
-
-app.use(express.json());
-
-// Health check endpoints
+// Health check endpoint
 app.get('/', (req, res) => {
   res.json({ 
     status: 'Server is running',
@@ -50,6 +50,55 @@ app.get('/health', (req, res) => {
     uptime: process.uptime(),
     connections: io.engine.clientsCount
   });
+});
+
+// ✨ NEW: AssemblyAI Token Generation Endpoint
+app.post('/api/assemblyai-token', async (req, res) => {
+  try {
+    console.log('🔑 Generating AssemblyAI temporary token...');
+    
+    const ASSEMBLYAI_API_KEY = process.env.ASSEMBLYAI_API_KEY;
+    
+    if (!ASSEMBLYAI_API_KEY) {
+      console.error('❌ ASSEMBLYAI_API_KEY not set in environment variables');
+      return res.status(500).json({ 
+        error: 'Server configuration error',
+        message: 'AssemblyAI API key not configured' 
+      });
+    }
+
+    // Generate temporary token from AssemblyAI
+    const response = await fetch('https://streaming.assemblyai.com/v3/token', {
+      method: 'GET',
+      headers: {
+        'Authorization': ASSEMBLYAI_API_KEY
+      }
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error('❌ AssemblyAI token generation failed:', response.status, errorText);
+      return res.status(response.status).json({ 
+        error: 'Failed to generate token',
+        details: errorText
+      });
+    }
+
+    const data = await response.json();
+    console.log('✅ AssemblyAI token generated successfully');
+    
+    res.json({ 
+      token: data.token,
+      expires_in: data.expires_in_seconds || 3600
+    });
+    
+  } catch (error) {
+    console.error('❌ Error generating AssemblyAI token:', error);
+    res.status(500).json({ 
+      error: 'Internal server error',
+      message: error.message 
+    });
+  }
 });
 
 // Socket.IO connection handling
@@ -79,14 +128,9 @@ io.on('connection', (socket) => {
     console.log(`📢 Notified room ${roomId} about new user: ${socket.id}`);
   });
 
-  // WebRTC signaling - Offer
+  // WebRTC signaling - Forward offer
   socket.on('offer', (data) => {
     console.log(`📨 Offer from ${socket.id} to ${data.to}`);
-    
-    if (!data.to) {
-      console.error('❌ Offer missing "to" field!');
-      return;
-    }
     
     const offerData = {
       offer: data.offer,
@@ -97,14 +141,9 @@ io.on('connection', (socket) => {
     console.log(`📤 Forwarded offer to ${data.to}`);
   });
 
-  // WebRTC signaling - Answer
+  // WebRTC signaling - Forward answer
   socket.on('answer', (data) => {
     console.log(`📨 Answer from ${socket.id} to ${data.to}`);
-    
-    if (!data.to) {
-      console.error('❌ Answer missing "to" field!');
-      return;
-    }
     
     const answerData = {
       answer: data.answer,
@@ -115,11 +154,12 @@ io.on('connection', (socket) => {
     console.log(`📤 Forwarded answer to ${data.to}`);
   });
 
-  // WebRTC signaling - ICE candidates
+  // WebRTC signaling - Forward ICE candidates
   socket.on('ice-candidate', (data) => {
     console.log(`🧊 ICE candidate from ${socket.id} to ${data.to}`);
     console.log(`   Candidate type: ${data.candidate?.type || 'unknown'}`);
     
+    // Validate required fields
     if (!data.to) {
       console.error('❌ ICE candidate missing "to" field!');
       return;
@@ -130,6 +170,7 @@ io.on('connection', (socket) => {
       return;
     }
     
+    // Forward with 'from' field
     const candidateData = {
       candidate: data.candidate,
       from: socket.id
@@ -165,4 +206,5 @@ httpServer.listen(PORT, () => {
   console.log(`🚀 Server running on port ${PORT}`);
   console.log(`🌐 CORS enabled for: https://emotion-video-client.vercel.app`);
   console.log(`📡 Socket.IO ready`);
+  console.log(`🔑 AssemblyAI integration: ${process.env.ASSEMBLYAI_API_KEY ? '✅ Enabled' : '❌ Disabled (API key missing)'}`);
 });
